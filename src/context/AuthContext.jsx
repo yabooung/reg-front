@@ -1,73 +1,28 @@
-import { createContext, useState, useEffect } from 'react';
-import { login, register, logout, checkAuth } from '../api/auth';
+import { createContext, useState } from 'react';
+// import { login, register, logout, checkAuth } from '../api/auth';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // 테스트를 위해 항상 인증된 상태로 설정
+  const [user, setUser] = useState({ id: '1', name: '테스트 사용자', email: 'test@example.com' });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          const userData = await checkAuth();
-          setUser(userData);
-        }
-      } catch (err) {
-        console.error('Authentication error:', err);
-        localStorage.removeItem('token');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initAuth();
-  }, []);
-
-  const handleLogin = async (credentials) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { user, token } = await login(credentials);
-      localStorage.setItem('token', token);
-      setUser(user);
-      return user;
-    } catch (err) {
-      setError(err.message || '로그인에 실패했습니다.');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+  // 더미 함수들
+  const handleLogin = async () => {
+    console.log('로그인 시도 (테스트 모드)');
+    return true;
   };
 
-  const handleRegister = async (userData) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { user, token } = await register(userData);
-      localStorage.setItem('token', token);
-      setUser(user);
-      return user;
-    } catch (err) {
-      setError(err.message || '회원가입에 실패했습니다.');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+  const handleRegister = async () => {
+    console.log('회원가입 시도 (테스트 모드)');
+    return true;
   };
 
   const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (err) {
-      console.error('Logout error:', err);
-    } finally {
-      localStorage.removeItem('token');
-      setUser(null);
-    }
+    console.log('로그아웃 시도 (테스트 모드)');
+    return true;
   };
 
   return (
@@ -79,7 +34,7 @@ export const AuthProvider = ({ children }) => {
         login: handleLogin,
         register: handleRegister,
         logout: handleLogout,
-        isAuthenticated: !!user,
+        isAuthenticated: true, // 항상 인증된 상태
       }}
     >
       {children}
