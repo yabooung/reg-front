@@ -5,9 +5,15 @@ import RegisterPage from './pages/RegisterPage';
 import HistoryPage from './pages/HistoryPage';
 import TestPage from './pages/TestPage';
 import PrivateRoute from './components/common/PrivateRoute';
+import MainPage from './pages/MainPage';
+import LayoutTest from './pages/LayoutTest';
 
 const Routes = () => {
   const router = createBrowserRouter([
+    {
+      path: '/',
+      element: <MainPage />,
+    },
     {
       path: '/',
       element: <PrivateRoute><ChatPage /></PrivateRoute>,
@@ -27,6 +33,10 @@ const Routes = () => {
     {
       path: '/test',
       element: <TestPage />,
+    },
+    {
+      path: '/layout-test',
+      element: <LayoutTest />,
     }
   ]);
 
