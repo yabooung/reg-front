@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import ChatMessage from './ChatMessage';
+import EnhancedChatMessage from './EnhancedChatMessage';
 import TypingIndicator from './TypingIndicator';
 
 const MessageList = ({ messages, loading }) => {
@@ -37,7 +37,7 @@ const MessageList = ({ messages, loading }) => {
           </div>
           <div className="space-y-4">
             {messages.map((message, index) => (
-              <ChatMessage
+              <EnhancedChatMessage
                 key={message.id || index}
                 message={message}
                 isUser={message.sender === 'user'}
