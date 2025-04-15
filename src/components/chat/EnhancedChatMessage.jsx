@@ -47,11 +47,11 @@ const EnhancedChatMessage = ({ message, isUser }) => {
     
     return (
       <div className="prose max-w-none">
-        {/* 질문 세부 분석 - 메인 콘텐츠로 표시 */}
+        {/* 질문 세부 분석 - 메인 콘텐츠로 표시 (먼저 표시) */}
         {data.question_breakdown && data.question_breakdown.length > 0 && (
           <div className="space-y-5 mb-6">
             {data.question_breakdown.map((item, index) => (
-              <div key={index} className="pb-5">
+              <div key={index} className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm mb-5">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">{item.question}</h3>
                 <div className="text-gray-700 whitespace-pre-line leading-relaxed">
                   {item.answer.split('\n').map((paragraph, i) => (
@@ -68,7 +68,7 @@ const EnhancedChatMessage = ({ message, isUser }) => {
           </div>
         )}
         
-        {/* 최종 답변 - 개별 답변 다음에 표시 */}
+        {/* 최종 답변 - 마지막에 표시 */}
         {data.final_answer && (
           <div className="mt-6 mb-6 pt-4 border-t border-gray-200">
             <h3 className="text-lg font-semibold text-gray-800 mb-3">종합 답변</h3>

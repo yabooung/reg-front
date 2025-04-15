@@ -16,7 +16,6 @@ const Chat = () => {
     useMock, 
     useSimpleQuery, 
     apiOptions, 
-    toggleMockMode,
     useApiModel,
     useCustomPrompt
   } = useSettings();
@@ -180,29 +179,7 @@ const Chat = () => {
               {renderInput(false)}
               <div className="flex justify-between items-center text-xs text-gray-500 mt-2">
                 <div className="flex items-center text-gray-600">
-                  <span className="font-medium text-[#10a37f]">Reg Navigator</span>
-                  <div className="ml-3">
-                    <SimpleQueryToggle type="switch" />
-                  </div>
-                </div>
-                <div className="flex items-center">
-                  <div className="flex items-center">
-                    <span>{useMock ? '목업 응답 모드' : '실제 API 모드'}</span>
-                    <div className="ml-2">
-                      <button
-                        onClick={toggleMockMode}
-                        className={`relative inline-flex h-4 w-8 flex-shrink-0 cursor-pointer rounded-full border-2 ${
-                          useMock ? 'border-amber-500 bg-amber-100' : 'border-green-500 bg-green-100'
-                        } transition-colors duration-200 ease-in-out focus:outline-none`}
-                      >
-                        <span
-                          className={`inline-block h-3 w-3 transform rounded-full ${
-                            useMock ? 'translate-x-4 bg-amber-500' : 'translate-x-0 bg-green-500'
-                          } transition duration-200 ease-in-out`}
-                        />
-                      </button>
-                    </div>
-                  </div>
+                  <span className="font-medium text-[#10a37f]">RegNavigator</span>
                 </div>
               </div>
             </div>

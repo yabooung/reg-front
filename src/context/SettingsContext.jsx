@@ -12,9 +12,9 @@ export const SettingsProvider = ({ children }) => {
   // 단순 쿼리 모드 상태 (기본값을 true로 변경)
   const [useSimpleQuery, setUseSimpleQuery] = useState(true);
   
-  // API 모델과 프롬프트 사용 여부 설정
-  const [useApiModel, setUseApiModel] = useState(true);
+  // 커스텀 프롬프트 사용 여부 설정
   const [useCustomPrompt, setUseCustomPrompt] = useState(true);
+  const [useDataCollection, setUseDataCollection] = useState(true);
   
   // API 옵션 상태
   const [apiOptions, setApiOptions] = useState({
@@ -50,17 +50,40 @@ export const SettingsProvider = ({ children }) => {
   
   // 단순 쿼리 모드 토글
   const toggleSimpleQuery = () => {
-    setUseSimpleQuery(prev => !prev);
-  };
-  
-  // API 모델 사용 토글
-  const toggleApiModel = () => {
-    setUseApiModel(prev => !prev);
+    const newValue = !useSimpleQuery;
+    setUseSimpleQuery(newValue);
+    
+    // 쿼리만 전송 모드가 켜지면 프로세싱 단계도 비활성화
+    if (newValue) {
+      setApiOptions(prev => ({
+        ...prev,
+        enableClassification: false,
+        enableAmplification: false,
+        enableValidation: false
+      }));
+      
+      // 기타 설정도 비활성화
+      setUseCustomPrompt(false);
+      setUseDataCollection(false);
+    }
   };
   
   // 커스텀 프롬프트 사용 토글
-  const toggleCustomPrompt = () => {
-    setUseCustomPrompt(prev => !prev);
+  const toggleCustomPrompt = (forceValue) => {
+    if (forceValue !== undefined) {
+      setUseCustomPrompt(forceValue);
+    } else {
+      setUseCustomPrompt(prev => !prev);
+    }
+  };
+  
+  // 데이터 컬렉션 사용 토글
+  const toggleDataCollection = (forceValue) => {
+    if (forceValue !== undefined) {
+      setUseDataCollection(forceValue);
+    } else {
+      setUseDataCollection(prev => !prev);
+    }
   };
   
   // API 옵션 변경 핸들러
@@ -93,13 +116,22 @@ export const SettingsProvider = ({ children }) => {
       collectionName: DEFAULT_MODEL_SETTINGS.collectionName
     });
     setUseSimpleQuery(true); // 초기화 시에도 쿼리만 전송 모드 유지
-    setUseApiModel(true);
     setUseCustomPrompt(true);
+    setUseDataCollection(true);
   };
   
   // 통합 설정 저장 핸들러
   const saveUnifiedSettings = (newSettings) => {
     setUnifiedSettings({...unifiedSettings, ...newSettings});
+    
+    // 기능 활성화 설정 업데이트
+    if (newSettings.useCustomPrompt !== undefined) {
+      setUseCustomPrompt(newSettings.useCustomPrompt);
+    }
+    
+    if (newSettings.useDataCollection !== undefined) {
+      setUseDataCollection(newSettings.useDataCollection);
+    }
     
     // API 옵션도 함께 업데이트
     setApiOptions({
@@ -126,10 +158,10 @@ export const SettingsProvider = ({ children }) => {
     toggleMockMode,
     useSimpleQuery,
     toggleSimpleQuery,
-    useApiModel,
-    toggleApiModel,
     useCustomPrompt,
     toggleCustomPrompt,
+    useDataCollection,
+    toggleDataCollection,
     apiOptions,
     handleApiOptionChange,
     resetApiOptions,
