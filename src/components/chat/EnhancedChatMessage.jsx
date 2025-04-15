@@ -38,71 +38,89 @@ const EnhancedChatMessage = ({ message, isUser }) => {
 
   const parsedContent = parseContent();
   
-  // 법률 참조 렌더링
-  const renderReferencedLaws = (laws) => {
-    if (!laws || !Array.isArray(laws) || laws.length === 0) return null;
-    
-    return (
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <h4 className="font-medium text-sm text-gray-700 mb-2">참조 법률</h4>
-        <ul className="list-disc pl-5 space-y-1">
-          {laws.map((law, index) => (
-            <li key={index} className="text-sm text-gray-600">{law}</li>
-          ))}
-        </ul>
-      </div>
-    );
-  };
-  
-  // 법률 용어 설명 렌더링
-  const renderLegalTerms = (terms) => {
-    if (!terms || Object.keys(terms).length === 0) return null;
-    
-    return (
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <h4 className="font-medium text-sm text-gray-700 mb-2">법률 용어 설명</h4>
-        <dl className="space-y-2">
-          {Object.entries(terms).map(([term, definition], index) => (
-            <div key={index} className="mb-2">
-              <dt className="font-medium text-sm text-gray-700">{term}</dt>
-              <dd className="text-sm text-gray-600 pl-4">{definition}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    );
-  };
-  
   // JSON 응답 렌더링
   const renderJsonResponse = () => {
     const { data } = parsedContent;
     
+    // 중요: 'thinking_process'를 표시하지 않습니다.
+    // 사용자에게는 최종 결과만 보여주고 내부 프로세스는 숨깁니다.
+    
     return (
-      <div className="space-y-4">
-        {/* 최종 답변이 있으면 표시 */}
+      <div className="prose max-w-none">
+        {/* 질문 세부 분석 - 메인 콘텐츠로 표시 */}
+        {data.question_breakdown && data.question_breakdown.length > 0 && (
+          <div className="space-y-5 mb-6">
+            {data.question_breakdown.map((item, index) => (
+              <div key={index} className="pb-5">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">{item.question}</h3>
+                <div className="text-gray-700 whitespace-pre-line leading-relaxed">
+                  {item.answer.split('\n').map((paragraph, i) => (
+                    paragraph.trim() ? <p key={i} className="mb-3">{paragraph}</p> : null
+                  ))}
+                </div>
+                {item.legal_basis && (
+                  <div className="text-sm text-gray-500 mt-3 pt-2 border-t border-gray-100">
+                    <span className="font-medium">근거:</span> {item.legal_basis}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* 최종 답변 - 개별 답변 다음에 표시 */}
         {data.final_answer && (
-          <div className="text-gray-800 leading-relaxed font-medium">
-            {data.final_answer}
-          </div>
-        )}
-        
-        {/* 관련 법률 */}
-        {renderReferencedLaws(data.referenced_laws)}
-        
-        {/* 관련 판례 */}
-        {data.referenced_precedents && data.referenced_precedents.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <h4 className="font-medium text-sm text-gray-700 mb-2">관련 판례</h4>
-            <ul className="list-disc pl-5 space-y-1">
-              {data.referenced_precedents.map((precedent, index) => (
-                <li key={index} className="text-sm text-gray-600">{precedent}</li>
+          <div className="mt-6 mb-6 pt-4 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">종합 답변</h3>
+            <div className="bg-gray-50 rounded-lg p-5 border border-gray-200 shadow-sm">
+              {data.final_answer.split('\n').map((paragraph, i) => (
+                paragraph.trim() ? <p key={i} className="mb-3 last:mb-0 text-gray-800 leading-relaxed">{paragraph}</p> : null
               ))}
-            </ul>
+            </div>
           </div>
         )}
         
-        {/* 법률 용어 설명 */}
-        {renderLegalTerms(data.legal_terms_explained)}
+        {/* 참조 정보 섹션 - 접을 수 있는 콜랩스 처리 */}
+        {((data.referenced_laws && data.referenced_laws.length > 0) || 
+          (data.legal_terms_explained && Object.keys(data.legal_terms_explained).length > 0)) && (
+          <details className="mt-5 bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+            <summary className="p-4 font-medium text-blue-600 cursor-pointer flex items-center">
+              <span>관련 참조 정보</span>
+              <span className="ml-2 text-xs text-gray-500">
+                (법률 {data.referenced_laws?.length || 0}개, 용어 {Object.keys(data.legal_terms_explained || {}).length}개)
+              </span>
+            </summary>
+            
+            <div className="px-5 pb-5 pt-2">
+              {/* 관련 법률 */}
+              {data.referenced_laws && data.referenced_laws.length > 0 && (
+                <div className="mb-5">
+                  <h4 className="font-medium text-gray-700 mb-3">참조 법률</h4>
+                  <ul className="list-disc pl-6 space-y-2">
+                    {data.referenced_laws.map((law, index) => (
+                      <li key={index} className="text-gray-600">{law}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* 법률 용어 설명 */}
+              {data.legal_terms_explained && Object.keys(data.legal_terms_explained).length > 0 && (
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-3">법률 용어 설명</h4>
+                  <dl className="space-y-3">
+                    {Object.entries(data.legal_terms_explained).map(([term, definition], index) => (
+                      <div key={index} className="mb-2 pb-2 border-b border-gray-100 last:border-0">
+                        <dt className="font-medium text-gray-700">{term}</dt>
+                        <dd className="text-gray-600 pl-4 mt-1">{definition}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
+            </div>
+          </details>
+        )}
       </div>
     );
   };
@@ -120,16 +138,20 @@ const EnhancedChatMessage = ({ message, isUser }) => {
         )}
         
         {/* 메시지 내용 */}
-        <div className={`${isUser ? 'max-w-[75%]' : 'max-w-[80%]'}`}>
+        <div className={`${isUser ? 'max-w-[75%]' : 'max-w-[85%]'}`}>
           <div className={`${
             isUser 
               ? 'bg-blue-50 text-gray-800 py-3 px-4 rounded-lg shadow-sm' 
-              : 'bg-white border border-gray-200 shadow-sm py-3 px-4 rounded-lg'
-            } text-base leading-relaxed `}
+              : 'bg-white border border-gray-200 shadow-sm py-5 px-6 rounded-lg'
+            } text-base leading-relaxed`}
           >
             {parsedContent.isJson 
               ? renderJsonResponse() 
-              : content
+              : <div className="whitespace-pre-line">
+                  {content.split('\n').map((paragraph, i) => (
+                    paragraph.trim() ? <p key={i} className="mb-3 last:mb-0">{paragraph}</p> : null
+                  ))}
+                </div>
             }
           </div>
           {timestamp && (
