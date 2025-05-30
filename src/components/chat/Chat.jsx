@@ -1,94 +1,202 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import MessageList from './MessageList';
 import ExamplePrompts from './ExamplePrompts';
-import { chatWithAI } from '../../api/chatService';
+import { chatWithAI } from './chatService';
 import { useSettings } from '../../context/SettingsContext';
 import { SimpleQueryToggle } from '../settings';
-import { Send, MessageCircle, InfoIcon } from 'lucide-react';
+import { Send, MessageCircle, InfoIcon, Loader2 } from 'lucide-react';
 
 const Chat = () => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
+  const eventSourceRef = useRef(null);
   
   // 설정 컨텍스트에서 상태 가져오기
   const { 
-    useMock, 
-    useSimpleQuery, 
-    apiOptions, 
-    useApiModel,
-    useCustomPrompt
+    useMock
   } = useSettings();
 
   const handleSendMessage = async () => {
-    if (message.trim()) {
-      // 사용자 메시지 추가
-      const userMessage = {
-        id: Date.now(),
-        content: message,
-        sender: 'user',
-        timestamp: new Date().toISOString()
-      };
-      
-      setMessages([...messages, userMessage]);
-      setMessage('');
-      setLoading(true);
-      
-      try {
-        // API 호출 옵션 구성
-        let chatOptions = useSimpleQuery ? {} : {
-          ...apiOptions,
-          useApiModel,  // API 모델 사용 여부
-          useCustomPrompt,  // 커스텀 프롬프트 사용 여부
-          useSimpleQuery  // 단순 쿼리 모드 여부
-        };
-        
-        // API 호출
-        const response = await chatWithAI(
-          message, 
-          chatOptions, 
-          useMock
-        );
-        
-        // 응답 처리 - JSON 형식 응답이 포함된 경우 처리
-        let messageContent = '';
-        
-        // raw_json이 있는 경우 이것을 그대로 표시 (EnhancedChatMessage가 파싱)
-        if (response.raw_json) {
-          messageContent = `\`\`\`json\n${response.raw_json}\n\`\`\``;
-        } else {
-          messageContent = response.answer || response.response || '죄송합니다, 응답을 생성하는 데 문제가 발생했습니다.';
-        }
-        
-        const botResponse = {
-          id: Date.now() + 1,
-          content: messageContent,
-          sender: 'bot',
-          timestamp: new Date().toISOString(),
-          references: response.references || []
-        };
-        
-        setMessages(prev => [...prev, botResponse]);
-      } catch (error) {
-        console.error('API 요청 중 오류가 발생했습니다:', error);
-        
-        // 오류 메시지 추가
-        const errorMessage = {
-          id: Date.now() + 1,
-          content: '죄송합니다, 서버 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
-          sender: 'bot',
-          timestamp: new Date().toISOString()
-        };
-        
-        setMessages(prev => [...prev, errorMessage]);
-      } finally {
-        setLoading(false);
+    if (!message.trim() || loading) return;
+
+    // 사용자 메시지 추가
+    const userMessage = {
+      id: Date.now(),
+      content: message,
+      sender: 'user',
+      timestamp: new Date().toISOString()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setMessage('');
+    setLoading(true);
+    
+    // 스트리밍 메시지 초기화
+    const streamingId = Date.now() + 1;
+    const newStreamingMessage = {
+      id: streamingId,
+      content: '',
+      sender: 'bot',
+      timestamp: new Date().toISOString(),
+      isStreaming: true,
+      metadata: {
+        agents: [],
+        steps: [],
+        metrics: null
       }
+    };
+    
+    setStreamingMessage(newStreamingMessage);
+    setMessages(prev => [...prev, newStreamingMessage]);
+    
+    try {
+      // API 호출 옵션 구성
+      const options = {
+        streaming: true,
+        onEvent: (event) => {
+          console.log('Stream event:', event);
+          
+          switch (event.type) {
+            case 'start':
+              if (!sessionId && event.data.session_id) {
+                setSessionId(event.data.session_id);
+              }
+              break;
+              
+            case 'analysis':
+              setMessages(prev => prev.map(msg => 
+                msg.id === streamingId 
+                  ? {
+                      ...msg,
+                      metadata: {
+                        ...msg.metadata,
+                        analysis: event.data
+                      }
+                    }
+                  : msg
+              ));
+              break;
+              
+            case 'agent_start':
+              setMessages(prev => prev.map(msg => 
+                msg.id === streamingId 
+                  ? {
+                      ...msg,
+                      metadata: {
+                        ...msg.metadata,
+                        agents: [...(msg.metadata.agents || []), event.data.agent],
+                        currentAgent: event.data.agent
+                      }
+                    }
+                  : msg
+              ));
+              break;
+              
+            case 'agent_complete':
+              setMessages(prev => prev.map(msg => 
+                msg.id === streamingId 
+                  ? {
+                      ...msg,
+                      metadata: {
+                        ...msg.metadata,
+                        currentAgent: null
+                      }
+                    }
+                  : msg
+              ));
+              break;
+              
+            case 'answer':
+              setMessages(prev => prev.map(msg => 
+                msg.id === streamingId 
+                  ? {
+                      ...msg,
+                      content: event.data.answer,
+                      confidence: event.data.confidence
+                    }
+                  : msg
+              ));
+              break;
+              
+            case 'metrics':
+              setMessages(prev => prev.map(msg => 
+                msg.id === streamingId 
+                  ? {
+                      ...msg,
+                      metadata: {
+                        ...msg.metadata,
+                        metrics: event.data
+                      }
+                    }
+                  : msg
+              ));
+              break;
+              
+            case 'end':
+              setMessages(prev => prev.map(msg => 
+                msg.id === streamingId 
+                  ? {
+                      ...msg,
+                      isStreaming: false
+                    }
+                  : msg
+              ));
+              setStreamingMessage(null);
+              setLoading(false);
+              break;
+              
+            case 'error':
+              setMessages(prev => prev.map(msg => 
+                msg.id === streamingId 
+                  ? {
+                      ...msg,
+                      content: event.data.message || '오류가 발생했습니다.',
+                      isError: true,
+                      isStreaming: false
+                    }
+                  : msg
+              ));
+              setStreamingMessage(null);
+              setLoading(false);
+              break;
+          }
+        }
+      };
+
+      // API 호출
+      await chatWithAI(message, options, useMock);
+      
+    } catch (error) {
+      console.error('Chat API 요청 오류:', error);
+      setMessages(prev => prev.map(msg => 
+        msg.id === streamingId 
+          ? {
+              ...msg,
+              content: '오류가 발생했습니다. 다시 시도해주세요.',
+              isError: true,
+              isStreaming: false
+            }
+          : msg
+      ));
+      setStreamingMessage(null);
+      setLoading(false);
     }
   };
 
-  const handleExampleClick = (exampleText) => {
-    setMessage(exampleText);
+  // 컴포넌트 언마운트 시 EventSource 정리
+  React.useEffect(() => {
+    return () => {
+      if (eventSourceRef.current && eventSourceRef.current.close) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
+
+  const handleExampleClick = (example) => {
+    setMessage(example);
   };
 
   const renderInput = (isLarge = false) => (
@@ -99,13 +207,19 @@ const Chat = () => {
         onChange={(e) => setMessage(e.target.value)}
         placeholder={isLarge ? "규제 관련 질문을 입력하세요..." : "질문을 입력하세요..."}
         className={`flex-1 bg-transparent border-0 outline-none text-gray-800 ${isLarge ? 'px-5 py-5 text-lg' : 'px-4 py-4 text-base'}`}
-        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+        onKeyPress={(e) => e.key === 'Enter' && !loading && handleSendMessage()}
+        disabled={loading}
       />
       <button 
         onClick={handleSendMessage}
-        className={`rounded-lg bg-[#10a37f] text-white hover:bg-[#0e9270] transition-colors ${isLarge ? 'p-3 mx-3 my-2' : 'p-2.5 mx-2'}`}
+        disabled={loading}
+        className={`rounded-lg ${loading ? 'bg-gray-400' : 'bg-[#10a37f] hover:bg-[#0e9270]'} text-white transition-colors ${isLarge ? 'p-3 mx-3 my-2' : 'p-2.5 mx-2'}`}
       >
-        <Send className={`${isLarge ? 'w-6 h-6' : 'w-5 h-5'}`} />
+        {loading ? (
+          <Loader2 className={`${isLarge ? 'w-6 h-6' : 'w-5 h-5'} animate-spin`} />
+        ) : (
+          <Send className={`${isLarge ? 'w-6 h-6' : 'w-5 h-5'}`} />
+        )}
       </button>
     </div>
   );
@@ -154,7 +268,7 @@ const Chat = () => {
                 </div>
                 <div className="flex items-start">
                   <span className="mr-2 text-[#10a37f]">•</span>
-                  <span>상단 네비게이션 바의 API 설정 버튼으로 응답의 정확성과 길이를 조절할 수 있습니다</span>
+                  <span>답변이 실시간으로 스트리밍되어 빠르게 확인할 수 있습니다</span>
                 </div>
               </div>
             </div>
@@ -165,7 +279,7 @@ const Chat = () => {
         <div className="flex-1 overflow-y-auto pb-32 bg-gradient-to-r from-gray-100 to-gray-200">
           <div className="px-4 max-w-4xl mx-auto w-full">
             <div className="bg-white rounded-xl overflow-hidden mt-4">
-              <MessageList messages={messages} loading={loading} />
+              <MessageList messages={messages} loading={loading} streamingMessage={streamingMessage} />
             </div>
           </div>
         </div>
@@ -180,6 +294,7 @@ const Chat = () => {
               <div className="flex justify-between items-center text-xs text-gray-500 mt-2">
                 <div className="flex items-center text-gray-600">
                   <span className="font-medium text-[#10a37f]">RegNavigator</span>
+                  {sessionId && <span className="ml-2 text-gray-400">• 세션: {sessionId.slice(0, 8)}...</span>}
                 </div>
               </div>
             </div>
@@ -190,4 +305,4 @@ const Chat = () => {
   );
 };
 
-export default Chat; 
+export default Chat;

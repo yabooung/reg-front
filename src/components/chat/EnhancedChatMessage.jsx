@@ -38,6 +38,88 @@ const EnhancedChatMessage = ({ message, isUser }) => {
 
   const parsedContent = parseContent();
   
+  // 법률 텍스트 구조 파싱 (헤더, 정의, 조항 등)
+  const parseLegalText = (text) => {
+    if (!text) return [];
+
+    // 헤더(### 제목) 패턴 찾기
+    const sections = [];
+    let currentSection = null;
+    let currentSubsection = null;
+    
+    // 텍스트를 줄 단위로 분리
+    const lines = text.split('\n');
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // 헤더 감지 (### 형식)
+      if (line.startsWith('###')) {
+        if (currentSection) {
+          sections.push(currentSection);
+        }
+        currentSection = {
+          title: line.replace(/^###\s+/, ''),
+          content: [],
+          subsections: [],
+          isList: false
+        };
+        currentSubsection = null;
+        continue;
+      }
+      
+      // 소제목 감지 (** 형식)
+      const boldMatch = line.match(/^\*\*(.*?)\*\*:/);
+      if (boldMatch) {
+        if (currentSection) {
+          // 이전 소제목이 있으면 저장
+          if (currentSubsection && currentSubsection.content.length > 0) {
+            currentSection.subsections.push(currentSubsection);
+          }
+          
+          // 새 소제목 생성
+          currentSubsection = {
+            title: boldMatch[1],
+            content: [],
+            isList: false
+          };
+        }
+        continue;
+      }
+      
+      // 목록 항목 감지 (- 또는 * 형식)
+      if (line.trim().match(/^[•\-*]\s+/)) {
+        if (currentSubsection) {
+          currentSubsection.isList = true;
+          currentSubsection.content.push(line.trim().replace(/^[•\-*]\s+/, ''));
+        } else if (currentSection) {
+          currentSection.isList = true;
+          currentSection.content.push(line.trim().replace(/^[•\-*]\s+/, ''));
+        }
+        continue;
+      }
+      
+      // 일반 텍스트 처리
+      if (line.trim()) {
+        if (currentSubsection) {
+          currentSubsection.content.push(line.trim());
+        } else if (currentSection) {
+          currentSection.content.push(line.trim());
+        }
+      }
+    }
+    
+    // 마지막 소제목과 섹션 추가
+    if (currentSubsection && currentSubsection.content.length > 0 && currentSection) {
+      currentSection.subsections.push(currentSubsection);
+    }
+    if (currentSection) {
+      sections.push(currentSection);
+    }
+    
+    return sections;
+  };
+  
   // JSON 응답 렌더링
   const renderJsonResponse = () => {
     const { data } = parsedContent;
@@ -125,6 +207,80 @@ const EnhancedChatMessage = ({ message, isUser }) => {
     );
   };
 
+  // 법률 텍스트 렌더링 (마크다운 기반 구조화)
+  const renderLegalContent = () => {
+    const sections = parseLegalText(content);
+
+    if (!sections || sections.length === 0) {
+      // 기본 텍스트 표시 (구조화 못한 경우)
+      return (
+        <div className="whitespace-pre-line">
+          {content.split('\n').map((paragraph, i) => (
+            paragraph.trim() ? <p key={i} className="mb-3 last:mb-0">{paragraph}</p> : null
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="prose max-w-none">
+        {sections.map((section, idx) => (
+          <div key={idx} className="mb-5 last:mb-0">
+            {section.title && (
+              <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b border-gray-200 pb-2">
+                {section.title}
+              </h3>
+            )}
+            
+            {/* 섹션 내용 (소제목이 없는 경우) */}
+            {section.subsections.length === 0 && (
+              section.isList ? (
+                <ul className="list-disc pl-6 space-y-2">
+                  {section.content.map((item, i) => (
+                    <li key={i} className="text-gray-700">{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-gray-700 space-y-3">
+                  {section.content.map((paragraph, i) => (
+                    <p key={i} className="leading-relaxed">{paragraph}</p>
+                  ))}
+                </div>
+              )
+            )}
+            
+            {/* 소제목이 있는 경우 */}
+            {section.subsections.length > 0 && (
+              <div className="space-y-4 mt-3">
+                {section.subsections.map((subsection, subIdx) => (
+                  <div key={subIdx} className="pl-4 border-l-2 border-gray-200">
+                    <h4 className="text-base font-medium text-gray-800 mb-2">
+                      {subsection.title}
+                    </h4>
+                    
+                    {subsection.isList ? (
+                      <ul className="list-disc pl-6 space-y-2">
+                        {subsection.content.map((item, i) => (
+                          <li key={i} className="text-gray-700">{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-gray-700 space-y-2">
+                        {subsection.content.map((paragraph, i) => (
+                          <p key={i} className="leading-relaxed">{paragraph}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="w-full">
       <div className={`flex items-start ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -147,11 +303,13 @@ const EnhancedChatMessage = ({ message, isUser }) => {
           >
             {parsedContent.isJson 
               ? renderJsonResponse() 
-              : <div className="whitespace-pre-line">
-                  {content.split('\n').map((paragraph, i) => (
-                    paragraph.trim() ? <p key={i} className="mb-3 last:mb-0">{paragraph}</p> : null
-                  ))}
-                </div>
+              : isUser 
+                ? <div className="whitespace-pre-line">
+                    {content.split('\n').map((paragraph, i) => (
+                      paragraph.trim() ? <p key={i} className="mb-3 last:mb-0">{paragraph}</p> : null
+                    ))}
+                  </div>
+                : renderLegalContent()
             }
           </div>
           {timestamp && (

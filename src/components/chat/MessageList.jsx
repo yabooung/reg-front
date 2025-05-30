@@ -1,8 +1,9 @@
 import React, { useRef, useEffect } from 'react';
 import EnhancedChatMessage from './EnhancedChatMessage';
+import StreamingMessage from './streamingMessage';
 import TypingIndicator from './TypingIndicator';
 
-const MessageList = ({ messages, loading }) => {
+const MessageList = ({ messages, loading, streamingMessage }) => {
   const messagesEndRef = useRef(null);
 
   // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
@@ -36,15 +37,28 @@ const MessageList = ({ messages, loading }) => {
             </div>
           </div>
           <div className="space-y-4">
-            {messages.map((message, index) => (
-              <EnhancedChatMessage
-                key={message.id || index}
-                message={message}
-                isUser={message.sender === 'user'}
-              />
-            ))}
+            {messages.map((message, index) => {
+              // 스트리밍 중이거나 스트리밍이 끝난 메시지인 경우 StreamingMessage 사용
+              if (message.isStreaming || (message.sender === 'bot' && message.metadata)) {
+                return (
+                  <StreamingMessage
+                    key={message.id || index}
+                    message={message}
+                  />
+                );
+              }
+              // 사용자 메시지나 일반 메시지인 경우 EnhancedChatMessage 사용
+              return (
+                <EnhancedChatMessage
+                  key={message.id || index}
+                  message={message}
+                  isUser={message.sender === 'user'}
+                />
+              );
+            })}
             
-            {loading && <TypingIndicator />}
+            {/* Loading indicator only shows when not streaming */}
+            {loading && !streamingMessage && <TypingIndicator />}
             
             <div ref={messagesEndRef} className="h-10" />
           </div>
@@ -54,4 +68,4 @@ const MessageList = ({ messages, loading }) => {
   );
 };
 
-export default MessageList; 
+export default MessageList;
